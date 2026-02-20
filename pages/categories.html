@@ -1,0 +1,22 @@
+---
+layout: page
+title: 카테고리
+permalink: /pages/categories/
+---
+
+{% assign categories = site.categories | sort %}
+<div class="category-index">
+  {% for category in categories %}
+    <section class="category-section" id="category-{{ category[0] | slugify }}">
+      <h2>{{ category[0] }}</h2>
+      <ul>
+        {% for post in category[1] %}
+          <li>
+            <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+            <span class="post-meta">{{ post.date | date: "%Y.%m.%d" }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
+</div>
