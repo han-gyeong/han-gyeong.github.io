@@ -8,15 +8,10 @@ summary: "MySQL MVCC 환경에서 UPDATE 조건절 서브쿼리가 Consistent Re
 
 
 
-특정 발송 스케줄을 DB 상 선점하여 발송하는 부분에서 이슈가 발생했다.
-
+특정 발송 스케줄을 DB 상 선점하여 발송하는 부분에서 이슈가 발생했다.  
 일부 발송건이 두 모듈에 의해 중복으로 처리되어 중복발송 처리가 된 것이다.
 
-
-
 장애의 원인은 MySQL 에서 Current 모드와 Consistent 모드 읽기 차이로 인해 발생했다.
-
-
 
 ### 어떻게 발생하게 되었는가?
 
@@ -74,21 +69,18 @@ sequenceDiagram
 
 
 
-위에 다이어그램을 보면 이상한 점이 존재한다.
-
+위에 다이어그램을 보면 이상한 점이 존재한다.  
 Module A 가 업데이트 쿼리를 통해 먼저 선점을 해갔으나, 이후 수행한 Module B도 동일한 데이터에 업데이트를 수행했다.
 
 
 
 일반적으로 생각한다면 아래와 같아야 한다.
-
 - Module A 가 업데이트 쿼리를 통한 2건 선점
 - Module B 는 A 가 업데이트 쿼리 수행 시 결과 없음
 
 
 
-하지만 실제로는 두 모듈이 동일하게 2개의 Row 를 업데이트 치게 된다.
-
+하지만 실제로는 두 모듈이 동일하게 2개의 Row 를 업데이트 치게 된다.  
 이 현상의 원인은 MySQL 에서 Current 모드와 Consistent 모드의 읽기 방식 차이로 인해 발생한다.
 
 
@@ -96,8 +88,6 @@ Module A 가 업데이트 쿼리를 통해 먼저 선점을 해갔으나, 이후
 #### Consistent Read
 
 InnoDB 에서 일반적인 SELECT 는 Consistent Read 방식으로 동작한다.
-
-
 
 Consistent Read 의 경우 아래와 같은 특징을 가진다.
 
@@ -113,21 +103,13 @@ Consistent Read 의 경우 아래와 같은 특징을 가진다.
 select * from schedule where status = 'WAITING';
 ```
 
-
-
 #### Current Read
 
-반면 아래와 같은 케이스의 경우에는 Current Read 를 수행한다.
-
+반면 아래와 같은 케이스의 경우에는 Current Read 를 수행한다.  
 - UPDATE, DELETE, SELECT ... FOR UPDATE
 
-
-
 Current Read 의 경우 아래와 같은 특징을 가진다.
-
 - 현재 최신 버전의 데이터를 기준으로 읽으며 필요한 경우 row lock을 획득한다.
-
-
 
 예를 들어, 아래와 같은 쿼리는 Current Read 방식으로 동작한다.
 
@@ -184,7 +166,7 @@ WHERE s.id IN (
 
 실행 흐름으로 보자면,
 
-1) WHERE 조건에서 서브쿼리의 결과 집합이 Consistent Read 기준으로 추출된다.
+1) WHERE 조건에서 서브쿼리의 결과 집합이 Consistent Read 기준으로 추출된다.  
 2) 추출된 결과 집합을 기준으로 UPDATE 를 수행해 동일한 row 들이 업데이트 된다.
 
 
@@ -193,8 +175,7 @@ WHERE s.id IN (
 
 #### Current 모드로 업데이트 수행
 
-단순히 위의 쿼리를 수정한다면 아래와 같이 조건절에 값 하나를 추가해줄 수 있다.
-
+단순히 위의 쿼리를 수정한다면 아래와 같이 조건절에 값 하나를 추가해줄 수 있다.  
 실제로 해당 운영 환경에서는 아래와 같이 조치를 수행했다.
 
 ```sql
@@ -215,14 +196,10 @@ WHERE s.id IN (
 
 
 
-이 조건을 추가하면 UPDATE 단계에서 status 값을 다시 한 번 검증하게 된다.
-
+이 조건을 추가하면 UPDATE 단계에서 status 값을 다시 한 번 검증하게 된다.  
 UPDATE는 Current Read로 실행되기 때문에 다른 트랜잭션이 먼저 status 값을 변경했다면 두 번째 트랜잭션은 해당 row를 UPDATE 대상으로 선택하지 않게 된다.
 
-
-
-즉, 서브쿼리 단계에서는 Consistent Read 로 대상이 계산되지만 UPDATE 시에는 Current Read 기준으로 다시 조건이 검증되기 때문에 
-
+즉, 서브쿼리 단계에서는 Consistent Read 로 대상이 계산되지만 UPDATE 시에는 Current Read 기준으로 다시 조건이 검증되기 때문에  
 이미 다른 트랜잭션이 처리한 row는 UPDATE 대상에서 제외된다.
 
 
